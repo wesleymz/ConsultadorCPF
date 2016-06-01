@@ -7,7 +7,7 @@ class Consultador
 	{
 		$ch = curl_init("http://www.receita.fazenda.gov.br/PessoaJuridica/CNPJ/cnpjreva/captcha/gerarCaptcha.asp");
 
-		// Preenche cabecalho da requisicao http.
+		// Preenche cabeçalho da requisicao http.
 		curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:45.0) Gecko/20100101 Firefox/45.0");
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_HEADER, true);
@@ -160,10 +160,89 @@ class Consultador
 
 		$html = curl_exec($ch);
 		curl_close($ch);
-		print $cookie;
+		
 		// Retorna html da pagina resultante.
 		return $html;
 
+	} // End function
+	
+	public static function extrairNomeEmpresarial($html)
+	{
+		$output = array();
+		$output["nome"] = "";
+		$output["erro"] = false;
+		
+		// Se houver campo "NOME EMPRESARIAL":
+		if (strpos($html, "NOME EMPRESARIAL ") !== false)
+		{
+			$doc = new DOMDocument();
+			
+			// Carrega html ignorando erros.
+			@$doc->loadHTML($html);
+			
+			// Obtem todos as tags <b> do documento.
+			$elements = $doc->getElementsByTagName('b');
+			
+			// Retorna Nome Empresarial contido na 9a tag <b> do documento.
+			$output["nome"] = $elements->item(8)->nodeValue;
+		
+			return $output;
+		}
+		else
+		{		
+			if (preg_match("/N.o existe no Cadastro de Pessoas Jur.dicas o n.mero de CNPJ informado\./", $html))
+			{
+				$output["erro"] = "CNPJ inexistente.";
+				return $output;
+			}
+			if (preg_match("/O n.mero do CNPJ n.o . v.lido\./", $html))
+			{
+				$output["erro"] = "CNPJ invalido.";
+				return $output;
+			}	
+		}
+	}
+	
+	public static function extrairNomePessoaFisica($html)
+	{
+		$output = array();
+		$output["nome"] = "";
+		$output["erro"] = false;
+		
+		// Se houver campo "Nome da Pessoa":
+		if (strpos($html, "Nome da Pessoa") !== false)
+		{
+			$doc = new DOMDocument();
+			
+			// Carrega html ignorando erros.
+			@$doc->loadHTML($html);
+			
+			// Obtem todas as tags <b> do documento.
+			$elements = $doc->getElementsByTagName('b');
+			
+			// Retorna nome da pessoa física contido na 2a tag <b> do documento.
+			$output["nome"] = $elements->item(1)->nodeValue;
+			return $output;
+		}
+		else
+		{
+			if (strpos($html, "divergente da constante na base de dados da Secretaria da Receita Federal do Brasil"))
+			{
+				$output["erro"] = "Data de nascimento divergente.";
+				return $output;
+			}
+			if (strpos($html, "CPF incorreto."))
+			{
+				$output["erro"] = "CPF incorreto.";
+				return $output;
+			}
+			if (strpos($html, "CPF Inexistente."))
+			{
+				$output["erro"] = "CPF Inexistente.";
+				return $output;
+			}
+		}
+		
 	} // End function
 
 } // End class
